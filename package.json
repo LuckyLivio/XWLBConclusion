@@ -11,6 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "docx": "^9.6.0",
     "express": "^5.2.1",
     "jsdom": "^20.0.0",
     "node-fetch": "^3.2.10"

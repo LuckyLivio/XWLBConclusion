@@ -3,6 +3,7 @@ import jsdom from 'jsdom';
 const { JSDOM } = jsdom;
 import fs from 'fs';
 import path, { resolve } from 'path';
+import { createNewsDocx } from './docx-generator.js';
 
 import { fileURLToPath } from "url";
 // const __filename = fileURLToPath(import.meta.url);
@@ -166,11 +167,18 @@ const updateCatalogue = async ({ catalogueJsonPath, readmeMdPath, date, abstract
 		data = data.toString();
 		// Check if link already exists
 		if (!data.includes(`[${date}](./news/${date}.md)`)) {
-			let text = data.replace('<!-- INSERT -->', `<!-- INSERT -->\n- [${date}](./news/${date}.md)`)
+			let text = data.replace('<!-- INSERT -->', `<!-- INSERT -->\n- [${date}](./news/${date}.md) ([Word](./news/${date}.docx))`)
 			await writeFile(readmeMdPath, text);
 			console.log('更新 README.md 完成');
 		} else {
-			console.log('README.md 中已存在该日期，跳过更新');
+            // 如果已经有了 md 链接但没有 docx 链接 (针对旧数据或刚才运行过的情况)
+            if (!data.includes(`([Word](./news/${date}.docx))`)) {
+                let text = data.replace(`[${date}](./news/${date}.md)`, `[${date}](./news/${date}.md) ([Word](./news/${date}.docx))`);
+                await writeFile(readmeMdPath, text);
+                console.log('更新 README.md (添加 Word 链接) 完成');
+            } else {
+			    console.log('README.md 中已存在该日期，跳过更新');
+            }
 		}
 	});
 }
@@ -181,6 +189,8 @@ export const fetchNews = async (dateStr) => {
 	const NEWS_PATH = path.join(__dirname, 'news');
 	// /news/xxxxxxxx.md 文件
 	const NEWS_MD_PATH = path.join(NEWS_PATH, DATE + '.md');
+    // /news/xxxxxxxx.docx 文件
+    const NEWS_DOCX_PATH = path.join(NEWS_PATH, DATE + '.docx');
 	// /README.md 文件
 	const README_PATH = path.join(__dirname, 'README.md');
 	// /news/catalogue.json 文件
@@ -210,6 +220,16 @@ export const fetchNews = async (dateStr) => {
 		});
 
 		await saveTextToFile(NEWS_MD_PATH, md);
+        
+        // 生成并保存 Word 文档
+        const docxBuffer = await createNewsDocx({
+            date: DATE,
+            abstract: abstractContent,
+            news: newsContent,
+            links: newsListResult.news
+        });
+        await writeFile(NEWS_DOCX_PATH, docxBuffer);
+
 		await updateCatalogue({ 
 			catalogueJsonPath: CATALOGUE_JSON_PATH,
 			readmeMdPath: README_PATH,
