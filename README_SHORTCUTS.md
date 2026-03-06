@@ -25,22 +25,30 @@
    - 添加 **从富文本制作 Markdown (Make Markdown from Rich Text)** (可选，用于更好的格式) 或直接查看。
    - 添加 **快速查看 (Quick Look)** 或 **显示结果 (Show Result)** 来阅读新闻。
 
-## 方法 2: GitHub 原始内容 (无服务器)
+## 方法 2: GitHub 原始内容 (无服务器，推荐)
 
 如果你已经将此项目部署到 GitHub 并启用了 GitHub Action (每日自动更新)，你可以直接获取原始文件。
 
 1. **获取 URL**:
-   **注意**: 必须使用 `raw.githubusercontent.com` 开头的链接，不能直接复制浏览器地址栏的链接！
-   URL 格式为:
-   `https://raw.githubusercontent.com/<你的用户名>/xin-wen-lian-bo/master/news/<YYYYMMDD>.md`
+   **注意**: 必须使用 `raw.githubusercontent.com` 开头的链接。
+   
+   URL 模板为:
+   `https://raw.githubusercontent.com/LuckyLivio/XWLBConclusion/main/news/<YYYYMMDD>.md`
+
+   例如: `https://raw.githubusercontent.com/LuckyLivio/XWLBConclusion/main/news/20260305.md`
 
 2. **创建快捷指令**:
    - 添加 **日期 (Date)** 操作 (当前日期)。
    - 添加 **格式化日期 (Format Date)** 操作。
      - 格式字符串: `yyyyMMdd`
-   - 添加 **URL** 操作。
-     - `https://raw.githubusercontent.com/<你的用户名>/xin-wen-lian-bo/master/news/` + `格式化后的日期` + `.md`
+   - 添加 **文本 (Text)** 操作 (拼接 URL)。
+     - 输入: `https://raw.githubusercontent.com/LuckyLivio/XWLBConclusion/main/news/`
+     - 接着插入变量: `格式化后的日期`
+     - 接着输入: `.md`
    - 添加 **获取 URL 内容 (Get Contents of URL)** 操作。
+     - URL: `文本` (上面拼接好的结果)
+     - 方法: `GET`
+   - 添加 **从 Markdown 制作富文本 (Make Rich Text from Markdown)**。
    - 添加 **快速查看 (Quick Look)**。
 
 ## 自动推送 (Automatic Pushing)
