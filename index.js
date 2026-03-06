@@ -277,6 +277,18 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
             // 检查 md 和 docx 是否都存在
             if (fs.existsSync(NEWS_MD_PATH) && fs.existsSync(NEWS_DOCX_PATH)) {
                 console.log(`日期 ${dateStr} 的数据已完整存在，跳过。`);
+                
+                // 即使文件存在，也检查一下 README 是否包含 Word 链接（防止是旧数据）
+                const README_PATH = path.join(__dirname, 'README.md');
+                if (fs.existsSync(README_PATH)) {
+                    let readmeData = fs.readFileSync(README_PATH, 'utf-8');
+                    if (readmeData.includes(`[${dateStr}](./news/${dateStr}.md)`) && !readmeData.includes(`([Word](./news/${dateStr}.docx))`)) {
+                        console.log(`日期 ${dateStr} 的 Word 链接在 README 中缺失，正在修复...`);
+                        let text = readmeData.replace(`[${dateStr}](./news/${dateStr}.md)`, `[${dateStr}](./news/${dateStr}.md) ([Word](./news/${dateStr}.docx))`);
+                        fs.writeFileSync(README_PATH, text);
+                    }
+                }
+                
                 continue;
             }
 
