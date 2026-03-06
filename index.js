@@ -247,5 +247,44 @@ export const fetchNews = async (dateStr) => {
 // Check if running directly
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const dateArg = process.argv[2];
-    await fetchNews(dateArg);
+    
+    if (dateArg) {
+        // 如果指定了日期，只抓取那一天
+        await fetchNews(dateArg);
+    } else {
+        // 如果没指定日期，抓取最近 7 天
+        console.log('未指定日期，开始检查最近 7 天的新闻...');
+        
+        // 简单函数: 获取 dateStr
+        const getDateStr = (d) => {
+             const add0 = num => num < 10 ? ('0' + num) : num;
+             return '' + d.getFullYear() + add0(d.getMonth() + 1) + add0(d.getDate());
+        };
+
+        const today = new Date();
+        for (let i = 0; i < 7; i++) {
+            const date = new Date(today);
+            date.setDate(today.getDate() - i);
+            const dateStr = getDateStr(date);
+            
+            console.log(`\n------------------\n检查日期: ${dateStr}`);
+            
+            // 路径定义
+            const NEWS_PATH = path.join(__dirname, 'news');
+            const NEWS_MD_PATH = path.join(NEWS_PATH, dateStr + '.md');
+            const NEWS_DOCX_PATH = path.join(NEWS_PATH, dateStr + '.docx');
+
+            // 检查 md 和 docx 是否都存在
+            if (fs.existsSync(NEWS_MD_PATH) && fs.existsSync(NEWS_DOCX_PATH)) {
+                console.log(`日期 ${dateStr} 的数据已完整存在，跳过。`);
+                continue;
+            }
+
+            try {
+                await fetchNews(dateStr);
+            } catch (e) {
+                console.log(`日期 ${dateStr} 获取失败或暂无新闻 (可能是未来日期或未发布):`, e.message);
+            }
+        }
+    }
 }
