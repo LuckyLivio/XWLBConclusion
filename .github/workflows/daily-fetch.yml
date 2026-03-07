@@ -3,7 +3,7 @@ name: Daily News Fetch
 on:
   schedule:
     # Run every day at 12:30 UTC (20:30 Beijing Time)
-    - cron: '30 12 * * *'
+    - cron: '43 12 * * *'
   workflow_dispatch:
 
 permissions:
