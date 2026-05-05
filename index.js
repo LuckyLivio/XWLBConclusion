@@ -112,8 +112,18 @@ const getNews = async links => {
 		const url = links[i];
 		const html = await fetch(url);
 		const dom = new JSDOM(html);
-		const title = dom.window.document.querySelector('#page_body > div.allcontent > div.video18847 > div.playingVideo > div.tit')?.innerHTML?.replace('[视频]', '');
-		const content = dom.window.document.querySelector('#content_area')?.innerHTML;
+		const title = dom.window.document.querySelector('#page_body > div.allcontent > div.video18847 > div.playingVideo > div.tit')?.textContent?.replace('[视频]', '').trim();
+		const contentArea = dom.window.document.querySelector('#content_area');
+		let content = '';
+		if (contentArea) {
+			// 将 <p> 标签替换为换行，并移除其他 HTML 标签
+			content = contentArea.innerHTML
+				.replace(/<p[^>]*>/gi, '')
+				.replace(/<\/p>/gi, '\n\n')
+				.replace(/<br\s*\/?>/gi, '\n')
+				.replace(/<[^>]+>/g, '')
+				.trim();
+		}
 		news.push({ title, content });
 		console.count('获取的新闻则数');
 	}
@@ -145,26 +155,33 @@ const saveTextToFile = async (savePath, text) => {
 
 const updateCatalogue = async ({ catalogueJsonPath, readmeMdPath, date, abstract }) => {
 	// 更新 catalogue.json
-	await readFile(catalogueJsonPath).then(async data => {
-		data = data.toString();
-		let catalogueJson = JSON.parse(data || '[]');
-		// Check if date already exists to avoid duplicates
-		if (!catalogueJson.some(item => item.date === date)) {
-			catalogueJson.unshift({
-				date,
-				abstract,
-			});
-			let textJson = JSON.stringify(catalogueJson);
-			await writeFile(catalogueJsonPath, textJson);
-			console.log('更新 catalogue.json 完成');
-		} else {
-			console.log('catalogue.json 中已存在该日期，跳过更新');
+	let catalogueJson = [];
+	if (fs.existsSync(catalogueJsonPath)) {
+		try {
+			const data = fs.readFileSync(catalogueJsonPath, 'utf-8');
+			catalogueJson = JSON.parse(data || '[]');
+		} catch (e) {
+			console.error('读取 catalogue.json 失败:', e.message);
+			catalogueJson = [];
 		}
-	});
+	}
+
+	// Check if date already exists to avoid duplicates
+	if (!catalogueJson.some(item => item.date === date)) {
+		catalogueJson.unshift({
+			date,
+			abstract,
+		});
+		let textJson = JSON.stringify(catalogueJson, null, 2);
+		await writeFile(catalogueJsonPath, textJson);
+		console.log('更新 catalogue.json 完成');
+	} else {
+		console.log('catalogue.json 中已存在该日期，跳过更新');
+	}
 	
 	// 更新 README.md
-	await readFile(readmeMdPath).then(async data => {
-		data = data.toString();
+	if (fs.existsSync(readmeMdPath)) {
+		let data = fs.readFileSync(readmeMdPath, 'utf-8');
 		// Check if link already exists
 		if (!data.includes(`[${date}](./news/${date}.md)`)) {
 			let text = data.replace('<!-- INSERT -->', `<!-- INSERT -->\n- [${date}](./news/${date}.md) ([Word](./news/${date}.docx))`)
@@ -180,13 +197,16 @@ const updateCatalogue = async ({ catalogueJsonPath, readmeMdPath, date, abstract
 			    console.log('README.md 中已存在该日期，跳过更新');
             }
 		}
-	});
+	}
 }
 
 export const fetchNews = async (dateStr) => {
 	const DATE = dateStr || getDate();
 	// /news 目录
 	const NEWS_PATH = path.join(__dirname, 'news');
+	if (!fs.existsSync(NEWS_PATH)) {
+		fs.mkdirSync(NEWS_PATH, { recursive: true });
+	}
 	// /news/xxxxxxxx.md 文件
 	const NEWS_MD_PATH = path.join(NEWS_PATH, DATE + '.md');
     // /news/xxxxxxxx.docx 文件
