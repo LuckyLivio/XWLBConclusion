@@ -154,7 +154,9 @@ const saveTextToFile = async (savePath, text) => {
 }
 
 const updateCatalogue = async ({ catalogueJsonPath, readmeMdPath, date, abstract }) => {
-	// 更新 catalogue.json
+	const NEWS_DIR = path.dirname(catalogueJsonPath);
+	
+	// 1. 更新 catalogue.json
 	let catalogueJson = [];
 	if (fs.existsSync(catalogueJsonPath)) {
 		try {
@@ -162,40 +164,53 @@ const updateCatalogue = async ({ catalogueJsonPath, readmeMdPath, date, abstract
 			catalogueJson = JSON.parse(data || '[]');
 		} catch (e) {
 			console.error('读取 catalogue.json 失败:', e.message);
-			catalogueJson = [];
 		}
 	}
 
-	// Check if date already exists to avoid duplicates
-	if (!catalogueJson.some(item => item.date === date)) {
-		catalogueJson.unshift({
-			date,
-			abstract,
-		});
-		let textJson = JSON.stringify(catalogueJson, null, 2);
-		await writeFile(catalogueJsonPath, textJson);
+	// 检查当前日期是否已存在，不存在则添加
+	if (date && abstract && !catalogueJson.some(item => item.date === date)) {
+		catalogueJson.unshift({ date, abstract });
+		// 也可以顺便清理一下不在 news 目录里的条目
+		const existingFiles = fs.readdirSync(NEWS_DIR);
+		catalogueJson = catalogueJson.filter(item => existingFiles.includes(`${item.date}.md`));
+		
+		await writeFile(catalogueJsonPath, JSON.stringify(catalogueJson, null, 2));
 		console.log('更新 catalogue.json 完成');
-	} else {
-		console.log('catalogue.json 中已存在该日期，跳过更新');
 	}
 	
-	// 更新 README.md
+	// 2. 根据 news 文件夹下的实际文件全量更新 README.md
 	if (fs.existsSync(readmeMdPath)) {
-		let data = fs.readFileSync(readmeMdPath, 'utf-8');
-		// Check if link already exists
-		if (!data.includes(`[${date}](./news/${date}.md)`)) {
-			let text = data.replace('<!-- INSERT -->', `<!-- INSERT -->\n- [${date}](./news/${date}.md) ([Word](./news/${date}.docx))`)
-			await writeFile(readmeMdPath, text);
-			console.log('更新 README.md 完成');
+		let readmeContent = fs.readFileSync(readmeMdPath, 'utf-8');
+		
+		// 获取 news 目录下所有的 .md 文件 (排除 catalogue.json)
+		const files = fs.readdirSync(NEWS_DIR)
+			.filter(file => /^\d{8}\.md$/.test(file))
+			.map(file => file.replace('.md', ''))
+			.sort((a, b) => b - a); // 降序排列
+
+		const historyList = files.map(d => {
+			const hasDocx = fs.existsSync(path.join(NEWS_DIR, `${d}.docx`));
+			const docxLink = hasDocx ? ` ([Word](./news/${d}.docx))` : '';
+			return `- [${d}](./news/${d}.md)${docxLink}`;
+		}).join('\n');
+
+		// 替换 <!-- INSERT --> 之后的内容
+		const marker = '<!-- INSERT -->';
+		const markerIndex = readmeContent.indexOf(marker);
+		
+		if (markerIndex !== -1) {
+			const newReadmeContent = readmeContent.substring(0, markerIndex + marker.length) + '\n' + historyList + '\n';
+			await writeFile(readmeMdPath, newReadmeContent);
+			console.log('根据 news 目录同步更新 README.md 完成');
 		} else {
-            // 如果已经有了 md 链接但没有 docx 链接 (针对旧数据或刚才运行过的情况)
-            if (!data.includes(`([Word](./news/${date}.docx))`)) {
-                let text = data.replace(`[${date}](./news/${date}.md)`, `[${date}](./news/${date}.md) ([Word](./news/${date}.docx))`);
-                await writeFile(readmeMdPath, text);
-                console.log('更新 README.md (添加 Word 链接) 完成');
-            } else {
-			    console.log('README.md 中已存在该日期，跳过更新');
-            }
+			// 如果没找到标记，尝试在 ## History 后面追加
+			const historyHeader = '## History';
+			const historyIndex = readmeContent.indexOf(historyHeader);
+			if (historyIndex !== -1) {
+				const newReadmeContent = readmeContent.substring(0, historyIndex + historyHeader.length) + '\n\n' + marker + '\n' + historyList + '\n';
+				await writeFile(readmeMdPath, newReadmeContent);
+				console.log('未找到标记，已重新初始化 README.md 历史区域');
+			}
 		}
 	}
 }
@@ -296,19 +311,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
             // 检查 md 和 docx 是否都存在
             if (fs.existsSync(NEWS_MD_PATH) && fs.existsSync(NEWS_DOCX_PATH)) {
-                console.log(`日期 ${dateStr} 的数据已完整存在，跳过。`);
-                
-                // 即使文件存在，也检查一下 README 是否包含 Word 链接（防止是旧数据）
-                const README_PATH = path.join(__dirname, 'README.md');
-                if (fs.existsSync(README_PATH)) {
-                    let readmeData = fs.readFileSync(README_PATH, 'utf-8');
-                    if (readmeData.includes(`[${dateStr}](./news/${dateStr}.md)`) && !readmeData.includes(`([Word](./news/${dateStr}.docx))`)) {
-                        console.log(`日期 ${dateStr} 的 Word 链接在 README 中缺失，正在修复...`);
-                        let text = readmeData.replace(`[${dateStr}](./news/${dateStr}.md)`, `[${dateStr}](./news/${dateStr}.md) ([Word](./news/${dateStr}.docx))`);
-                        fs.writeFileSync(README_PATH, text);
-                    }
-                }
-                
+                console.log(`日期 ${dateStr} 的数据已完整存在，跳过抓取。`);
                 continue;
             }
 
@@ -318,5 +321,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
                 console.log(`日期 ${dateStr} 获取失败或暂无新闻 (可能是未来日期或未发布):`, e.message);
             }
         }
+
+        // 最后统一同步一次 README.md，确保所有 news 目录下的文件都列出来了
+        console.log('\n正在全量同步 README.md...');
+        await updateCatalogue({
+            catalogueJsonPath: path.join(__dirname, 'news', 'catalogue.json'),
+            readmeMdPath: path.join(__dirname, 'README.md')
+        });
     }
 }
