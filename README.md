@@ -5,6 +5,7 @@ Daily news from CCTV.
 ## History
 
 <!-- INSERT -->
+- [20260626](./news/20260626.md) ([Word](./news/20260626.docx))
 - [20260625](./news/20260625.md) ([Word](./news/20260625.docx))
 - [20260624](./news/20260624.md) ([Word](./news/20260624.docx))
 - [20260623](./news/20260623.md) ([Word](./news/20260623.docx))
